@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Core">
+      <UniqueIdentifier>{339EA1A5-0629-4E30-966A-9171107E0603}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sources\Spotify">
+      <UniqueIdentifier>{3FEE2C99-F259-4301-B6A3-A04B3F41F41F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sources\AirPlay">
+      <UniqueIdentifier>{A5A3F428-55BF-44CF-A83A-FBF4C0E4E3E7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sources\Local Files">
+      <UniqueIdentifier>{A6BC8250-9CBF-4391-815B-5437783BEAD6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sources\Online Radio">
+      <UniqueIdentifier>{0A85D4D9-CAC1-4B87-A1B4-E1B0C35B558A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sources\Vanilla">
+      <UniqueIdentifier>{921B411A-5F46-4C1A-BA58-4868350113C9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game Integration">
+      <UniqueIdentifier>{BF18A1BB-0C80-4458-B6B8-8740B7897842}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Runtime">
+      <UniqueIdentifier>{9B537E31-42BB-45A9-848F-56319734F761}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Third Party">
+      <UniqueIdentifier>{6D89EC29-9C44-48CB-B225-F8CE72BBF7E6}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\audio_hook.cpp"><Filter>Core</Filter></ClCompile>
+    <ClCompile Include="src\bridge_state.cpp"><Filter>Core</Filter></ClCompile>
+    <ClCompile Include="src\source_manager.cpp"><Filter>Core</Filter></ClCompile>
+    <ClCompile Include="src\airplay_source.cpp"><Filter>Sources\AirPlay</Filter></ClCompile>
+    <ClCompile Include="src\local_file_source.cpp"><Filter>Sources\Local Files</Filter></ClCompile>
+    <ClCompile Include="src\radio_source.cpp"><Filter>Sources\Online Radio</Filter></ClCompile>
+    <ClCompile Include="src\librespot.cpp"><Filter>Sources\Spotify</Filter></ClCompile>
+    <ClCompile Include="src\spotify_oauth.cpp"><Filter>Sources\Spotify</Filter></ClCompile>
+    <ClCompile Include="src\spotify_source.cpp"><Filter>Sources\Spotify</Filter></ClCompile>
+    <ClCompile Include="src\fmod_inject.cpp"><Filter>Game Integration</Filter></ClCompile>
+    <ClCompile Include="src\forza_dataout.cpp"><Filter>Game Integration</Filter></ClCompile>
+    <ClCompile Include="src\game_profile.cpp"><Filter>Game Integration</Filter></ClCompile>
+    <ClCompile Include="src\injector_inproc.cpp"><Filter>Game Integration</Filter></ClCompile>
+    <ClCompile Include="src\sigscan.cpp"><Filter>Game Integration</Filter></ClCompile>
+    <ClCompile Include="src\config.cpp"><Filter>Runtime</Filter></ClCompile>
+    <ClCompile Include="src\dllmain_version.cpp"><Filter>Runtime</Filter></ClCompile>
+    <ClCompile Include="src\forwarders.cpp"><Filter>Runtime</Filter></ClCompile>
+    <ClCompile Include="src\log_file.cpp"><Filter>Runtime</Filter></ClCompile>
+    <ClCompile Include="src\options.cpp"><Filter>Runtime</Filter></ClCompile>
+    <ClCompile Include="src\server.cpp"><Filter>Runtime</Filter></ClCompile>
+    <ClCompile Include="src\stderr_pump.cpp"><Filter>Runtime</Filter></ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\audio_hook.h"><Filter>Core</Filter></ClInclude>
+    <ClInclude Include="src\audio_source.h"><Filter>Core</Filter></ClInclude>
+    <ClInclude Include="src\bridge_state.h"><Filter>Core</Filter></ClInclude>
+    <ClInclude Include="src\source_manager.h"><Filter>Core</Filter></ClInclude>
+    <ClInclude Include="src\airplay_source.h"><Filter>Sources\AirPlay</Filter></ClInclude>
+    <ClInclude Include="src\local_file_source.h"><Filter>Sources\Local Files</Filter></ClInclude>
+    <ClInclude Include="src\radio_source.h"><Filter>Sources\Online Radio</Filter></ClInclude>
+    <ClInclude Include="src\vanilla_source.h"><Filter>Sources\Vanilla</Filter></ClInclude>
+    <ClInclude Include="src\librespot.h"><Filter>Sources\Spotify</Filter></ClInclude>
+    <ClInclude Include="src\spotify_oauth.h"><Filter>Sources\Spotify</Filter></ClInclude>
+    <ClInclude Include="src\spotify_source.h"><Filter>Sources\Spotify</Filter></ClInclude>
+    <ClInclude Include="src\fmod_inject.h"><Filter>Game Integration</Filter></ClInclude>
+    <ClInclude Include="src\forza_dataout.h"><Filter>Game Integration</Filter></ClInclude>
+    <ClInclude Include="src\game_profile.h"><Filter>Game Integration</Filter></ClInclude>
+    <ClInclude Include="src\injector_iface.h"><Filter>Game Integration</Filter></ClInclude>
+    <ClInclude Include="src\injector_inproc.h"><Filter>Game Integration</Filter></ClInclude>
+    <ClInclude Include="src\sigscan.h"><Filter>Game Integration</Filter></ClInclude>
+    <ClInclude Include="src\config.h"><Filter>Runtime</Filter></ClInclude>
+    <ClInclude Include="src\log_file.h"><Filter>Runtime</Filter></ClInclude>
+    <ClInclude Include="src\options.h"><Filter>Runtime</Filter></ClInclude>
+    <ClInclude Include="src\server.h"><Filter>Runtime</Filter></ClInclude>
+    <ClInclude Include="src\stderr_pump.h"><Filter>Runtime</Filter></ClInclude>
+    <ClInclude Include="vendor\httplib.h"><Filter>Third Party</Filter></ClInclude>
+    <ClInclude Include="vendor\miniaudio.h"><Filter>Third Party</Filter></ClInclude>
+  </ItemGroup>
+</Project>

@@ -21,10 +21,29 @@ Windows SDK, Node.js, and clean Release/x64 builds of:
 
 The mod links both libraries statically. Build all three projects with the v143
 toolset and the static multithreaded runtime (`/MT`); mixing CRT variants is not
-supported. The recommended setup is to build both library repositories from
-source and pass their repository roots to MSBuild. If all three repositories
-are cloned side by side under the same parent directory, these are also the
-project defaults and the two root overrides can be omitted.
+supported.
+
+The easiest manual Visual Studio setup is:
+
+1. Open and build `librespotclib.sln` in `Release|x64`.
+2. Open and build `airplayclib.sln` in `Release|x64`.
+3. Copy the resulting public headers and static libraries into this repository:
+
+```text
+librespotclib/include/librespotc/librespotc.h -> bridge/vendor/librespotc/librespotc.h
+librespotclib/bin/librespotc.lib               -> bridge/vendor/lib/librespotc.lib
+airplayclib/include/airplayc/airplayc.h        -> bridge/vendor/airplayc/airplayc.h
+airplayclib/bin/airplayc.lib                   -> bridge/vendor/lib/airplayc.lib
+```
+
+Those destination directories are present in a clean checkout and already
+configured as include and library search paths. The copied headers and binaries
+remain ignored by Git.
+
+If all three repositories are cloned side by side under the same parent
+directory, copying is unnecessary: the project also searches the two library
+repositories' `include` and `bin` directories by default. Arbitrary layouts can
+use `LibrespotcRoot` and `AirplaycRoot` overrides.
 
 ```powershell
 cd bridge/ui
@@ -37,33 +56,10 @@ msbuild bridge/bridge.sln /m /p:Configuration=Release /p:Platform=x64 `
   /p:AirplaycRoot=C:\path\to\airplayclib
 ```
 
-Each root must contain the library's public `include` directory and a
-Release/x64 static library in `bin` (`librespotc.lib` or `airplayc.lib`).
-
-For a local vendored layout, copy only locally built headers and libraries to:
-
-```text
-bridge/vendor/librespotc/include/librespotc/librespotc.h
-bridge/vendor/librespotc/lib/librespotc.lib
-bridge/vendor/airplayc/include/airplayc/airplayc.h
-bridge/vendor/airplayc/lib/airplayc.lib
-```
-
-Then build with `LibrespotcRoot` and `AirplaycRoot` pointing to those two vendor
-directories and set `LibrespotcLibDir` and `AirplaycLibDir` to their respective
-`lib` directories:
-
-```powershell
-msbuild bridge/bridge.sln /m /p:Configuration=Release /p:Platform=x64 `
-  /p:LibrespotcRoot=C:\path\to\spotify-radio\bridge\vendor\librespotc `
-  /p:LibrespotcLibDir=C:\path\to\spotify-radio\bridge\vendor\librespotc\lib `
-  /p:AirplaycRoot=C:\path\to\spotify-radio\bridge\vendor\airplayc `
-  /p:AirplaycLibDir=C:\path\to\spotify-radio\bridge\vendor\airplayc\lib
-```
-
-These vendor directories are ignored by Git: prebuilt
-libraries are compiler-configuration-specific and are not part of this
-source-only repository.
+Each overridden root must contain the library's public `include` directory and
+a Release/x64 static library in `bin` (`librespotc.lib` or `airplayc.lib`). For
+nonstandard output directories, also set `LibrespotcLibDir` or
+`AirplaycLibDir`.
 
 The DLL is written to `bridge/bin/version.dll`. No compiled dependencies or
 game files are included in this source repository.

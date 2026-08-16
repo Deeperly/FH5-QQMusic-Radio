@@ -25,8 +25,12 @@
 /bridge/ui/node_modules/
 /bridge/ui/dist/
 /bridge/ui/.svelte-kit/
-/bridge/vendor/librespotc/
-/bridge/vendor/airplayc/
+/bridge/vendor/librespotc/*
+!/bridge/vendor/librespotc/.gitkeep
+/bridge/vendor/airplayc/*
+!/bridge/vendor/airplayc/.gitkeep
+/bridge/vendor/lib/*
+!/bridge/vendor/lib/.gitkeep
 
 .env
 .env.*

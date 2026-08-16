@@ -48,7 +48,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(LibrespotcLibDir);$(AirplaycLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)vendor\lib;$(LibrespotcLibDir);$(AirplaycLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>winhttp.lib;crypt32.lib;bcrypt.lib;psapi.lib;ole32.lib;mfplat.lib;mfreadwrite.lib;mfuuid.lib;mmdevapi.lib;librespotc.lib;airplayc.lib;ws2_32.lib;dnsapi.lib;iphlpapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -90,14 +90,20 @@
     <ClInclude Include="src\librespot.h" />
     <ClInclude Include="src\log_file.h" />
     <ClInclude Include="src\options.h" />
+    <ClInclude Include="src\radio_source.h" />
     <ClInclude Include="src\server.h" />
     <ClInclude Include="src\sigscan.h" />
     <ClInclude Include="src\source_manager.h" />
     <ClInclude Include="src\spotify_oauth.h" />
     <ClInclude Include="src\spotify_source.h" />
     <ClInclude Include="src\stderr_pump.h" />
+    <ClInclude Include="src\vanilla_source.h" />
     <ClInclude Include="vendor\httplib.h" />
     <ClInclude Include="vendor\miniaudio.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="ValidateStreamingDependencies" BeforeTargets="ClCompile">
+    <Error Condition="(!Exists('$(ProjectDir)vendor\librespotc\librespotc.h') and !Exists('$(LibrespotcRoot)\include\librespotc\librespotc.h')) or (!Exists('$(ProjectDir)vendor\airplayc\airplayc.h') and !Exists('$(AirplaycRoot)\include\airplayc\airplayc.h')) or (!Exists('$(ProjectDir)vendor\lib\librespotc.lib') and !Exists('$(LibrespotcLibDir)\librespotc.lib')) or (!Exists('$(ProjectDir)vendor\lib\airplayc.lib') and !Exists('$(AirplaycLibDir)\airplayc.lib'))"
+           Text="Missing streaming dependencies. Build librespotclib and airplayclib in Release|x64, then copy librespotc.h to bridge\vendor\librespotc, airplayc.h to bridge\vendor\airplayc, and both .lib files to bridge\vendor\lib. Alternatively clone both repositories next to this one or set their Root/LibDir MSBuild properties. See README.md." />
+  </Target>
 </Project>

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{F1E2D3C4-B5A6-4789-9012-FEDCBA987654}</ProjectGuid>
+    <RootNamespace>bridge</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <OutDir>$(ProjectDir)bin\</OutDir>
+    <IntDir>$(ProjectDir)obj\</IntDir>
+    <TargetName>version</TargetName>
+    <LibrespotcRoot Condition="'$(LibrespotcRoot)'==''">$(ProjectDir)..\..\librespotclib</LibrespotcRoot>
+    <AirplaycRoot Condition="'$(AirplaycRoot)'==''">$(ProjectDir)..\..\airplayclib</AirplaycRoot>
+    <LibrespotcLibDir Condition="'$(LibrespotcLibDir)'==''">$(LibrespotcRoot)\bin</LibrespotcLibDir>
+    <AirplaycLibDir Condition="'$(AirplaycLibDir)'==''">$(AirplaycRoot)\bin</AirplaycLibDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_WINDLL;WIN32_LEAN_AND_MEAN;NOMINMAX;_CRT_SECURE_NO_WARNINGS;SPOTIFY_RADIO_DLL;$(ExtraDefines);$(DiagDefines);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <DebugInformationFormat>None</DebugInformationFormat>
+      <AdditionalIncludeDirectories>$(ProjectDir)vendor;$(LibrespotcRoot)\include;$(AirplaycRoot)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(LibrespotcLibDir);$(AirplaycLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>winhttp.lib;crypt32.lib;bcrypt.lib;psapi.lib;ole32.lib;mfplat.lib;mfreadwrite.lib;mfuuid.lib;mmdevapi.lib;librespotc.lib;airplayc.lib;ws2_32.lib;dnsapi.lib;iphlpapi.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="src\audio_hook.cpp" />
+    <ClCompile Include="src\airplay_source.cpp" />
+    <ClCompile Include="src\bridge_state.cpp" />
+    <ClCompile Include="src\config.cpp" />
+    <ClCompile Include="src\dllmain_version.cpp" />
+    <ClCompile Include="src\fmod_inject.cpp" />
+    <ClCompile Include="src\forwarders.cpp" />
+    <ClCompile Include="src\forza_dataout.cpp" />
+    <ClCompile Include="src\game_profile.cpp" />
+    <ClCompile Include="src\injector_inproc.cpp" />
+    <ClCompile Include="src\local_file_source.cpp" />
+    <ClCompile Include="src\librespot.cpp" />
+    <ClCompile Include="src\log_file.cpp" />
+    <ClCompile Include="src\options.cpp" />
+    <ClCompile Include="src\radio_source.cpp" />
+    <ClCompile Include="src\server.cpp" />
+    <ClCompile Include="src\sigscan.cpp" />
+    <ClCompile Include="src\source_manager.cpp" />
+    <ClCompile Include="src\spotify_oauth.cpp" />
+    <ClCompile Include="src\spotify_source.cpp" />
+    <ClCompile Include="src\stderr_pump.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\audio_source.h" />
+    <ClInclude Include="src\audio_hook.h" />
+    <ClInclude Include="src\airplay_source.h" />
+    <ClInclude Include="src\bridge_state.h" />
+    <ClInclude Include="src\config.h" />
+    <ClInclude Include="src\fmod_inject.h" />
+    <ClInclude Include="src\forza_dataout.h" />
+    <ClInclude Include="src\game_profile.h" />
+    <ClInclude Include="src\injector_iface.h" />
+    <ClInclude Include="src\injector_inproc.h" />
+    <ClInclude Include="src\local_file_source.h" />
+    <ClInclude Include="src\librespot.h" />
+    <ClInclude Include="src\log_file.h" />
+    <ClInclude Include="src\options.h" />
+    <ClInclude Include="src\server.h" />
+    <ClInclude Include="src\sigscan.h" />
+    <ClInclude Include="src\source_manager.h" />
+    <ClInclude Include="src\spotify_oauth.h" />
+    <ClInclude Include="src\spotify_source.h" />
+    <ClInclude Include="src\stderr_pump.h" />
+    <ClInclude Include="vendor\httplib.h" />
+    <ClInclude Include="vendor\miniaudio.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

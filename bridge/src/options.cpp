@@ -324,7 +324,7 @@ bool is_valid_volume_normalization(std::string_view value) {
 
 bool is_valid_active_source(std::string_view value) {
     return value == "spotify" || value == "airplay" || value == "local" ||
-           value == "radio" || value == "vanilla";
+           value == "radio" || value == "vanilla" || value == "qqmusic";
 }
 
 bool is_valid_night_runners_speed_unit(std::string_view value) {
@@ -564,6 +564,28 @@ bool parse_options_json(std::string_view json, PlaybackOptions& out) {
         return false;
     } else {
         out.local_artist_metadata_mode = kDefaultLocalArtistMetadataMode;
+    }
+
+    std::string qqmusic_process_name;
+    if (extract_json_string(json, "qqMusicProcessName",
+                            qqmusic_process_name)) {
+        out.qqmusic_process_name =
+            qqmusic_process_name.empty() ? "QQMusic.exe"
+                                         : qqmusic_process_name;
+    } else if (has_json_key(json, "qqMusicProcessName")) {
+        return false;
+    } else {
+        out.qqmusic_process_name = "QQMusic.exe";
+    }
+
+    std::string qqmusic_executable;
+    if (extract_json_string(json, "qqMusicExecutable",
+                            qqmusic_executable)) {
+        out.qqmusic_executable = qqmusic_executable;
+    } else if (has_json_key(json, "qqMusicExecutable")) {
+        return false;
+    } else {
+        out.qqmusic_executable = "F:/QQMusic/QQMusic.exe";
     }
 
     bool night_runners_mode = false;
@@ -969,6 +991,10 @@ std::string options_to_json(const PlaybackOptions& options) {
     append_json_string(out, local_title_metadata_mode);
     out << ",\"localArtistMetadataMode\":";
     append_json_string(out, local_artist_metadata_mode);
+    out << ",\"qqMusicProcessName\":";
+    append_json_string(out, options.qqmusic_process_name);
+    out << ",\"qqMusicExecutable\":";
+    append_json_string(out, options.qqmusic_executable);
     out << ",\"nightRunnersMode\":"
         << (options.night_runners_mode ? "true" : "false")
         << ",\"nightRunnersStoppedVolumeDecrease\":"

@@ -32,6 +32,8 @@ struct PlaybackOptions {
     uint32_t local_volume_percent = 100;
     std::string local_title_metadata_mode = "metadata"; // "metadata" or "filename"
     std::string local_artist_metadata_mode = "albumArtist"; // "albumArtist", "folder", or "album"
+    std::string qqmusic_process_name = "QQMusic.exe";
+    std::string qqmusic_executable = "F:/QQMusic/QQMusic.exe";
     bool night_runners_mode = false;
     uint32_t night_runners_stopped_volume_decrease_percent = 50;
     uint32_t night_runners_max_speed_mph = 120;

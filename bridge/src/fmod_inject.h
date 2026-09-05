@@ -146,8 +146,9 @@ public:
     // Kept for ABI compatibility with older status/build helpers; native DSP
     // output does not create a bridge-owned FMOD stream.
     static constexpr unsigned int kDecodeBufferFrames = 2048; // ~46 ms @ 44.1 kHz
-    // Baseline station gain before the native-DSP PCM lift in the mixer callback.
-    static constexpr float kRadioAudibleGain = 0.75f;
+    // Unity gain: preserve the captured QQ Music level and let FMOD's native
+    // radio effects and the game's radio volume control do all scaling.
+    static constexpr float kRadioAudibleGain = 1.0f;
     // Native-DSP PCM can pause during menu/lifecycle churn, then resume
     // at mixer cadence. Keep enough headroom to avoid starving immediately
     // after route transitions while still bounding stale backlog.
@@ -169,14 +170,27 @@ public:
                       uint16_t channels);
     bool feed_pcm_s16(const int16_t* samples, size_t frame_count,
                       uint16_t channels, float source_gain);
-    size_t pcm_free_bytes() const { return ring_.free_space(); }
-    size_t pcm_buffered_bytes() const { return ring_.available(); }
+    bool feed_pcm_float(const float* samples, size_t frame_count);
+    size_t pcm_free_bytes() const {
+        return pcm_float_mode_.load(std::memory_order_relaxed)
+                   ? float_ring_.free_space()
+                   : ring_.free_space();
+    }
+    size_t pcm_buffered_bytes() const {
+        return pcm_float_mode_.load(std::memory_order_relaxed)
+                   ? float_ring_.available()
+                   : ring_.available();
+    }
     bool pcm_accepting() const {
         return !local_audio_hold_.load(std::memory_order_acquire) &&
                (output_accepting_.load(std::memory_order_acquire) ||
                 prebuffer_audio_.load(std::memory_order_acquire));
     }
-    void clear_pcm() { ring_.clear(); }
+    void clear_pcm() {
+        ring_.clear();
+        float_ring_.clear();
+        pcm_float_mode_.store(false, std::memory_order_relaxed);
+    }
 
     bool is_playing() const { return playing_.load(std::memory_order_relaxed); }
 
@@ -240,6 +254,7 @@ public:
                                     std::function<bool()> next_track,
                                     std::function<std::optional<uint32_t>()> current_position_ms,
                                     std::function<uint32_t()> race_restart_threshold_s);
+    void set_station_change_track(std::function<bool()> next_track);
     void set_night_runners_controls(
         std::function<bool()> enabled,
         std::function<uint32_t()> stopped_volume_decrease_percent,
@@ -373,6 +388,9 @@ private:
     // PCM ring (S16LE interleaved) filled by librespotc and drained by the
     // native R10 FMOD DSP callback.
     ByteRingBuffer ring_{kRingBytes};
+    // High-fidelity QQ Music path: 48 kHz stereo float at unity gain.
+    ByteRingBuffer float_ring_{kRingBytes};
+    std::atomic<bool> pcm_float_mode_{false};
 
     std::atomic<uint64_t> pcm_call_count_{0};
     std::atomic<uint64_t> pcm_limiter_limited_samples_{0};
@@ -400,6 +418,7 @@ private:
     std::function<bool()> playback_pause_in_menus_;
     std::function<std::string()> playback_race_start_playback_;
     std::function<bool()> playback_quick_station_skip_;
+    std::function<bool()> station_change_next_track_;
     std::function<bool()> playback_is_playing_;
     std::function<void()> playback_pause_;
     std::function<void()> playback_resume_;

@@ -256,6 +256,7 @@
     'source.airplay': 'AirPlay',
     'source.local': 'Local Files',
     'source.radio': 'Online Radio',
+    'source.qqmusic': 'QQ Music',
     'source.vanilla': 'Vanilla Streamer Mode',
     'source.vanillaActive': "Game's own radio",
     'source.connected': 'Connected',
@@ -2571,6 +2572,8 @@
       <span class="material-icon source-local-icon" aria-hidden="true">folder</span>
     {:else if activeSource === 'radio'}
       <span class="material-icon source-local-icon" aria-hidden="true">radio</span>
+    {:else if activeSource === 'qqmusic'}
+      <span class="material-icon source-local-icon" aria-hidden="true">music_note</span>
     {:else if activeSource === 'airplay'}
       <svg class="source-airplay-icon" viewBox="0 0 24 24" aria-hidden="true">
         <rect x="4" y="5" width="16" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
@@ -2639,6 +2642,19 @@
         <span>
           <strong>{t('source.local')}</strong>
           <small>{local.trackCount > 0 ? tracksLabel(local.trackCount) : t('source.chooseFolder')}</small>
+        </span>
+      </button>
+      <button type="button" class:active={activeSource === 'qqmusic'}
+              disabled={sourceSwitching}
+              onclick={() => switchSource('qqmusic')}>
+        <span class="material-icon" aria-hidden="true">music_note</span>
+        <span>
+          <strong>{t('source.qqmusic')}</strong>
+          <small>{activeSource === 'qqmusic'
+            ? ($bridgeState.sources.qqmusic?.connected
+                ? t('source.connected')
+                : t('source.discoverable'))
+            : t('source.inactive')}</small>
         </span>
       </button>
     </aside>

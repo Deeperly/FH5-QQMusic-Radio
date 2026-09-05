@@ -22,6 +22,7 @@ const EMPTY = {
     airplay: { available: true, connected: false, playing: false },
     local: { available: true, connected: false, playing: false },
     radio: { available: true, connected: false, playing: false },
+    qqmusic: { available: true, connected: false, playing: false },
   },
   local: {
     available: true,
@@ -71,6 +72,8 @@ const EMPTY = {
     equalizerEnabled: false,
     equalizerBands: [0, 0, 0, 0, 0],
     localMusicDir: '',
+    qqMusicProcessName: 'QQMusic.exe',
+    qqMusicExecutable: 'F:/QQMusic/QQMusic.exe',
     localRecursive: true,
     localShuffle: true,
     localVolume: 100,

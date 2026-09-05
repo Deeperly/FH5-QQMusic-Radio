@@ -67,6 +67,7 @@
     <ClCompile Include="src\librespot.cpp" />
     <ClCompile Include="src\log_file.cpp" />
     <ClCompile Include="src\options.cpp" />
+    <ClCompile Include="src\qqmusic_source.cpp" />
     <ClCompile Include="src\radio_source.cpp" />
     <ClCompile Include="src\server.cpp" />
     <ClCompile Include="src\sigscan.cpp" />
@@ -90,6 +91,7 @@
     <ClInclude Include="src\librespot.h" />
     <ClInclude Include="src\log_file.h" />
     <ClInclude Include="src\options.h" />
+    <ClInclude Include="src\qqmusic_source.h" />
     <ClInclude Include="src\radio_source.h" />
     <ClInclude Include="src\server.h" />
     <ClInclude Include="src\sigscan.h" />

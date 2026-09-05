@@ -35,6 +35,7 @@
 #include "librespot.h"
 #include "log_file.h"
 #include "options.h"
+#include "qqmusic_source.h"
 #include "radio_source.h"
 #include "server.h"
 #include "source_manager.h"
@@ -461,6 +462,15 @@ DWORD WINAPI init_thread_proc(LPVOID) {
         [&fmod_inject]() {
             fmod_inject.clear_pcm();
         });
+    bridge::QQMusicSource qqmusic_source(
+        [&fmod_inject](const float* samples, size_t frames) {
+            return fmod_inject.feed_pcm_float(samples, frames);
+        },
+        [&fmod_inject]() {
+            fmod_inject.clear_pcm();
+        },
+        options.snapshot().qqmusic_process_name,
+        options.snapshot().qqmusic_executable);
     {
         auto initial_options = options.snapshot();
         std::string ignored;
@@ -496,6 +506,7 @@ DWORD WINAPI init_thread_proc(LPVOID) {
     sources.register_source(airplay_source);
     sources.set_local_source(local_source);
     sources.register_source(radio_source);
+    sources.register_source(qqmusic_source);
     sources.register_source(vanilla_source);
     {
         auto initial_options = options.snapshot();
@@ -569,6 +580,10 @@ DWORD WINAPI init_thread_proc(LPVOID) {
         },
         [&sources]() { return sources.current_position_ms(); },
         [&options]() { return options.snapshot().race_start_restart_threshold_s; });
+    fmod_inject.set_station_change_track([&sources]() {
+        return std::string(sources.active_source_id()) == "qqmusic" &&
+               sources.next_track();
+    });
     fmod_inject.set_injection_gate([&sources]() {
         return std::string(sources.active_source_id()) == "vanilla";
     });

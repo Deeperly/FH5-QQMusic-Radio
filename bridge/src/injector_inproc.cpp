@@ -6291,7 +6291,7 @@ bool InProcessInjector::write_game_string(uintptr_t addr, const std::string& tex
     }
 }
 
-// ---- Spotify-station gating (phase 3h refinement) ----
+// ---- Injection-station gating ----
 //
 // Preferred signal, sigscan-resolved at startup:
 //   rvas_.radio_state_singleton -> RadioState singleton (data RVA, build-relative)
@@ -6299,9 +6299,9 @@ bool InProcessInjector::write_game_string(uintptr_t addr, const std::string& tex
 //   RadioPlayer+0x50 -> selected RadioStation*
 //   RadioStation+0x200 -> MSVC std::string station name
 //
-// The installer keeps R10's XML Name as "Streamer Mode" and only changes the
-// sample display metadata/logo. If this chain is not live yet, fall back to
-// the older SampleProperties.SoundName sentinel path.
+// FH5 does not expose the media-free station in its radio wheel, so treat any
+// selected station as the injection target. If this chain is not live yet,
+// fall back to the older SampleProperties.SoundName sentinel path.
 // RadioState/RadioPlayer/RadioStation layout + station-detection string/sound
 // constants are per-game: they shift independently when either FH5 or FH6 ships
 // an update. They live in the active game profile (game_profile.h); this
@@ -6618,8 +6618,7 @@ bool InProcessInjector::is_spotify_station_active_locked() const {
         safe_read_qword(module_base_ + rvas_.radio_state_singleton, state) && state &&
         safe_read_qword(state + radio_layout().state_player_offset, player) && player &&
         safe_read_qword(player + radio_layout().player_selected_station_offset, station) && station) {
-        auto name = read_game_string(station + radio_layout().station_name_offset);
-        if (name && (*name == radio_layout().station_name_streamer || *name == radio_layout().station_name_spotify)) return true;
+        return true;
     }
 
     if (!any_active) return false;

@@ -46,6 +46,8 @@
 /scratch/
 /tmp/
 /dist/
+__pycache__/
+*.pyc
 
 Thumbs.db
 Desktop.ini

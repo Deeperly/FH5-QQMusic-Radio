@@ -398,6 +398,11 @@ void FmodInject::set_menu_playback_controls(
     playback_race_restart_threshold_s_ = std::move(race_restart_threshold_s);
 }
 
+void FmodInject::set_station_change_track(std::function<bool()> next_track) {
+    std::lock_guard lock(playback_controls_mtx_);
+    station_change_next_track_ = std::move(next_track);
+}
+
 void FmodInject::set_injection_gate(std::function<bool()> suppressed) {
     std::lock_guard lock(playback_controls_mtx_);
     injection_suppressed_ = std::move(suppressed);
@@ -583,7 +588,7 @@ bool FmodInject::feed_pcm_s16(const int16_t* samples, size_t frame_count,
     // During menu-triggered transport pause, reject further PCM and keep the
     // local ring empty so no pre-menu audio leaks after resume.
     if (local_audio_hold_.load(std::memory_order_acquire)) {
-        if (ring_.available() > 0) ring_.clear();
+        if (pcm_buffered_bytes() > 0) clear_pcm();
         return false;
     }
 
@@ -592,7 +597,7 @@ bool FmodInject::feed_pcm_s16(const int16_t* samples, size_t frame_count,
     // so accepting audio here would build a stale backlog that plays later.
     if (!output_accepting_.load(std::memory_order_acquire) &&
         !prebuffer_audio_.load(std::memory_order_acquire)) {
-        if (ring_.available() > 0) ring_.clear();
+        if (pcm_buffered_bytes() > 0) clear_pcm();
         return true;
     }
 
@@ -602,6 +607,9 @@ bool FmodInject::feed_pcm_s16(const int16_t* samples, size_t frame_count,
     }
     size_t bytes = frame_count * kPcmChannels * sizeof(int16_t);
     if (ring_.free_space() < bytes) return false;
+    if (pcm_float_mode_.exchange(false, std::memory_order_relaxed)) {
+        float_ring_.clear();
+    }
 
     source_gain = sanitize_source_gain(source_gain);
     if (channels == kPcmChannels &&
@@ -638,6 +646,32 @@ bool FmodInject::feed_pcm_s16(const int16_t* samples, size_t frame_count,
     return ring_.write(stereo.data(), bytes) == bytes;
 }
 
+bool FmodInject::feed_pcm_float(const float* samples, size_t frame_count) {
+    if (!samples || !frame_count) return true;
+
+    if (local_audio_hold_.load(std::memory_order_acquire)) {
+        if (pcm_buffered_bytes() > 0) clear_pcm();
+        return false;
+    }
+    if (!output_accepting_.load(std::memory_order_acquire) &&
+        !prebuffer_audio_.load(std::memory_order_acquire)) {
+        if (pcm_buffered_bytes() > 0) clear_pcm();
+        return true;
+    }
+    if (frame_count >
+        std::numeric_limits<size_t>::max() /
+            (kPcmChannels * sizeof(float))) {
+        return false;
+    }
+
+    const size_t bytes = frame_count * kPcmChannels * sizeof(float);
+    if (float_ring_.free_space() < bytes) return false;
+    if (!pcm_float_mode_.exchange(true, std::memory_order_relaxed)) {
+        ring_.clear();
+    }
+    return float_ring_.write(samples, bytes) == bytes;
+}
+
 FmodInject::Status FmodInject::status() const {
     Status s;
     s.audio_active       = playing_.load(std::memory_order_acquire);
@@ -647,7 +681,7 @@ FmodInject::Status FmodInject::status() const {
     s.channel_handle     =
         native_diag_target_handle_.load(std::memory_order_acquire);
     s.channel_group      = 0;
-    s.ring_available     = static_cast<uint64_t>(ring_.available());
+    s.ring_available     = static_cast<uint64_t>(pcm_buffered_bytes());
     s.output_gain        = output_gain_.load(std::memory_order_acquire);
     s.prebuffer_audio    = prebuffer_audio_.load(std::memory_order_acquire);
     s.local_audio_hold   = local_audio_hold_.load(std::memory_order_acquire);
@@ -1311,7 +1345,7 @@ void FmodInject::maybe_update_native_dsp_probe(bool r10_active,
         }
 
         uint64_t calls = native_dsp_call_count_.load(std::memory_order_relaxed);
-        size_t buffered = ring_.available();
+        size_t buffered = pcm_buffered_bytes();
         bool callback_expected =
             native_dsp_consumes_pcm() && !menu_open &&
             output_accepting_.load(std::memory_order_acquire) &&
@@ -1374,7 +1408,7 @@ void FmodInject::maybe_update_native_dsp_probe(bool r10_active,
                       + " out_ch=" + std::to_string(native_dsp_last_outchannels_.load())
                       + " mode=" + native_dsp_probe_mode_name(native_dsp_probe_mode_)
                       + " gain=" + std::to_string(output_gain_.load())
-                      + " ring=" + std::to_string(ring_.available())
+                      + " ring=" + std::to_string(pcm_buffered_bytes())
                       + " underruns=" + std::to_string(underrun_count_.load())
                       + " target=" + hex(reinterpret_cast<uintptr_t>(native_dsp_target_))
 #ifdef SPOTIFY_RADIO_DIAG
@@ -1560,7 +1594,6 @@ FMOD_RESULT FmodInject::native_dsp_read_cb(FMOD_DSP_STATE*,
                 self->native_dsp_low_cut_smoothed_amount_ = 0.0f;
             } else {
                 std::memset(outbuffer, 0, samples * sizeof(float));
-                constexpr float kNativeDspPcmProbeGain = 1.6f;
                 constexpr double kInputPerOutput =
                     static_cast<double>(kPcmSampleRate) / 48000.0;
                 float target_low_cut_amount = 0.0f;
@@ -1617,41 +1650,71 @@ FMOD_RESULT FmodInject::native_dsp_read_cb(FMOD_DSP_STATE*,
                     frame[1] = temp[1];
                     return true;
                 };
+                auto read_float_frame = [self](float (&frame)[kPcmChannels]) {
+                    float temp[kPcmChannels] = {};
+                    const size_t got = self->float_ring_.read(temp, sizeof(temp));
+                    if (got != sizeof(temp)) return false;
+                    frame[0] = temp[0];
+                    frame[1] = temp[1];
+                    return true;
+                };
+                const bool float_pcm =
+                    self->pcm_float_mode_.load(std::memory_order_relaxed);
 
                 for (unsigned int frame = 0; frame < length; ++frame) {
-                    if (!self->native_dsp_pcm_have_current_) {
-                        if (!read_frame(self->native_dsp_pcm_current_)) {
+                    float left = 0.0f;
+                    float right = 0.0f;
+                    if (float_pcm) {
+                        float pcm_frame[kPcmChannels] = {};
+                        if (!read_float_frame(pcm_frame)) {
                             self->underrun_count_.fetch_add(
                                 1, std::memory_order_relaxed);
                             underrun = true;
                             break;
                         }
-                        self->native_dsp_pcm_have_current_ = true;
-                    }
-                    if (!self->native_dsp_pcm_have_next_) {
-                        if (!read_frame(self->native_dsp_pcm_next_)) {
-                            self->underrun_count_.fetch_add(
-                                1, std::memory_order_relaxed);
-                            underrun = true;
-                            break;
+                        left = pcm_frame[0] * gain;
+                        right = pcm_frame[1] * gain;
+                    } else {
+                        if (!self->native_dsp_pcm_have_current_) {
+                            if (!read_frame(self->native_dsp_pcm_current_)) {
+                                self->underrun_count_.fetch_add(
+                                    1, std::memory_order_relaxed);
+                                underrun = true;
+                                break;
+                            }
+                            self->native_dsp_pcm_have_current_ = true;
                         }
-                        self->native_dsp_pcm_have_next_ = true;
-                    }
+                        if (!self->native_dsp_pcm_have_next_) {
+                            if (!read_frame(self->native_dsp_pcm_next_)) {
+                                self->underrun_count_.fetch_add(
+                                    1, std::memory_order_relaxed);
+                                underrun = true;
+                                break;
+                            }
+                            self->native_dsp_pcm_have_next_ = true;
+                        }
 
-                    double phase = self->native_dsp_pcm_phase_;
-                    float pcm_gain = gain * kNativeDspPcmProbeGain;
-                    float left = static_cast<float>(
-                        (static_cast<double>(self->native_dsp_pcm_current_[0]) +
-                         (static_cast<double>(self->native_dsp_pcm_next_[0]) -
-                          static_cast<double>(self->native_dsp_pcm_current_[0])) *
-                             phase) /
-                        32768.0 * pcm_gain);
-                    float right = static_cast<float>(
-                        (static_cast<double>(self->native_dsp_pcm_current_[1]) +
-                         (static_cast<double>(self->native_dsp_pcm_next_[1]) -
-                          static_cast<double>(self->native_dsp_pcm_current_[1])) *
-                             phase) /
-                        32768.0 * pcm_gain);
+                        const double phase = self->native_dsp_pcm_phase_;
+                        const float pcm_gain = gain;
+                        left = static_cast<float>(
+                            (static_cast<double>(
+                                 self->native_dsp_pcm_current_[0]) +
+                             (static_cast<double>(
+                                  self->native_dsp_pcm_next_[0]) -
+                              static_cast<double>(
+                                  self->native_dsp_pcm_current_[0])) *
+                                 phase) /
+                            32768.0 * pcm_gain);
+                        right = static_cast<float>(
+                            (static_cast<double>(
+                                 self->native_dsp_pcm_current_[1]) +
+                             (static_cast<double>(
+                                  self->native_dsp_pcm_next_[1]) -
+                              static_cast<double>(
+                                  self->native_dsp_pcm_current_[1])) *
+                                 phase) /
+                            32768.0 * pcm_gain);
+                    }
                     if (apply_low_cut) {
                         float amount = std::clamp(
                             self->native_dsp_low_cut_smoothed_amount_,
@@ -1685,22 +1748,24 @@ FMOD_RESULT FmodInject::native_dsp_read_cb(FMOD_DSP_STATE*,
                         }
                     }
 
-                    self->native_dsp_pcm_phase_ += kInputPerOutput;
-                    while (self->native_dsp_pcm_phase_ >= 1.0) {
-                        self->native_dsp_pcm_current_[0] =
-                            self->native_dsp_pcm_next_[0];
-                        self->native_dsp_pcm_current_[1] =
-                            self->native_dsp_pcm_next_[1];
-                        if (!read_frame(self->native_dsp_pcm_next_)) {
-                            self->native_dsp_pcm_have_next_ = false;
-                            self->underrun_count_.fetch_add(
-                                1, std::memory_order_relaxed);
-                            underrun = true;
-                            break;
+                    if (!float_pcm) {
+                        self->native_dsp_pcm_phase_ += kInputPerOutput;
+                        while (self->native_dsp_pcm_phase_ >= 1.0) {
+                            self->native_dsp_pcm_current_[0] =
+                                self->native_dsp_pcm_next_[0];
+                            self->native_dsp_pcm_current_[1] =
+                                self->native_dsp_pcm_next_[1];
+                            if (!read_frame(self->native_dsp_pcm_next_)) {
+                                self->native_dsp_pcm_have_next_ = false;
+                                self->underrun_count_.fetch_add(
+                                    1, std::memory_order_relaxed);
+                                underrun = true;
+                                break;
+                            }
+                            self->native_dsp_pcm_phase_ -= 1.0;
                         }
-                        self->native_dsp_pcm_phase_ -= 1.0;
                     }
-                    if (!self->native_dsp_pcm_have_next_) {
+                    if (!float_pcm && !self->native_dsp_pcm_have_next_) {
                         self->underrun_count_.fetch_add(
                             1, std::memory_order_relaxed);
                         underrun = true;
@@ -1751,6 +1816,7 @@ void FmodInject::native_dsp_gain_thread_fn() {
     constexpr float kNightRunnersLazyReleaseTauSec = 0.4f;
     constexpr float kGarageMaxMovingSpeedMps = 0.75f;
     constexpr size_t kMenuResumePrebufferBytes = 44100;
+    constexpr size_t kMenuResumePrebufferFloatBytes = 96000;
     bool last_r10_active = false;
     bool last_menu_open = false;
     bool last_local_hold = false;
@@ -1811,6 +1877,9 @@ void FmodInject::native_dsp_gain_thread_fn() {
     float diag_last_speed_mps = -1.0f;
 #endif
     auto now = std::chrono::steady_clock::now();
+    uintptr_t last_station_ptr = 0;
+    std::string last_station_name;
+    auto next_station_change_poll = now;
     auto quick_station_skip_left_at = now;
     auto quick_station_skip_inactive_since = now;
     auto playback_unmute_at = now;
@@ -1880,6 +1949,7 @@ void FmodInject::native_dsp_gain_thread_fn() {
         std::function<void()> resume;
         std::function<bool()> restart_current_track;
         std::function<bool()> next_track;
+        std::function<bool()> station_change_next_track;
         std::function<std::optional<uint32_t>()> current_position_ms;
         std::function<uint32_t()> race_restart_threshold_s;
         {
@@ -1892,6 +1962,7 @@ void FmodInject::native_dsp_gain_thread_fn() {
             resume = playback_resume_;
             restart_current_track = playback_restart_current_track_;
             next_track = playback_next_track_;
+            station_change_next_track = station_change_next_track_;
             current_position_ms = playback_current_position_ms_;
             race_restart_threshold_s = playback_race_restart_threshold_s_;
         }
@@ -2007,7 +2078,7 @@ void FmodInject::native_dsp_gain_thread_fn() {
 #endif
                 if (enabled && within_window && playing && next_track) {
                     bool ok = next_track();
-                    ring_.clear();
+                    clear_pcm();
                     log::info(std::string("[native-dsp] Quick station return — ")
                               + (ok ? "advanced to next Spotify track"
                                     : "could not advance Spotify queue/context"));
@@ -2016,11 +2087,41 @@ void FmodInject::native_dsp_gain_thread_fn() {
         }
         if (r10_active) quick_station_skip_seen_r10_active = true;
 
+        if (now >= next_station_change_poll) {
+            next_station_change_poll = now + std::chrono::milliseconds(200);
+            auto station_snapshot = injector_.radio_stream_debug_snapshot();
+            if (station_snapshot.selected_station_read &&
+                station_snapshot.selected_station != 0) {
+                const uintptr_t current_station =
+                    station_snapshot.selected_station;
+                const std::string current_name =
+                    station_snapshot.selected_station_name;
+                if (last_station_ptr != 0 &&
+                    current_station != last_station_ptr &&
+                    !current_name.empty() &&
+                    current_name != last_station_name &&
+                    !menu_open) {
+                    bool advanced =
+                        station_change_next_track &&
+                        station_change_next_track();
+                    if (advanced) clear_pcm();
+                    log::info(std::string("[native-dsp] Station change — ")
+                              + (advanced ? "advanced QQ Music track"
+                                          : "could not advance QQ Music track")
+                              + " from=\"" + sanitize_log_field(last_station_name)
+                              + "\" to=\"" + sanitize_log_field(current_name)
+                              + "\"");
+                }
+                last_station_ptr = current_station;
+                last_station_name = current_name;
+            }
+        }
+
         bool local_hold = r10_active && menu_open && pause_transport_in_menu;
         if (local_hold != last_local_hold) {
             local_audio_hold_.store(local_hold, std::memory_order_release);
             if (local_hold) {
-                ring_.clear();
+                clear_pcm();
                 bool should_pause = !is_playing || is_playing();
                 if (should_pause && pause) {
                     pause();
@@ -2032,7 +2133,7 @@ void FmodInject::native_dsp_gain_thread_fn() {
             } else {
                 if (paused_by_menu && resume) {
                     resume();
-                    ring_.clear();
+                    clear_pcm();
                     playback_prebuffering = true;
                     playback_unmute_at = now + kMenuResumePrebuffer;
                     prebuffer_audio_.store(true, std::memory_order_release);
@@ -2046,10 +2147,10 @@ void FmodInject::native_dsp_gain_thread_fn() {
         }
         if (local_hold && !paused_by_menu && pause) {
             bool should_pause = !is_playing || is_playing();
-            if (should_pause) {
-                pause();
-                paused_by_menu = true;
-                ring_.clear();
+                if (should_pause) {
+                    pause();
+                    paused_by_menu = true;
+                    clear_pcm();
                 log::info("[native-dsp] Game menu hold — paused Spotify transport after external resume");
             }
         }
@@ -2057,12 +2158,15 @@ void FmodInject::native_dsp_gain_thread_fn() {
 
         if (playback_prebuffering &&
             (now >= playback_unmute_at ||
-             ring_.available() >= kMenuResumePrebufferBytes ||
+             pcm_buffered_bytes() >=
+                 (pcm_float_mode_.load(std::memory_order_relaxed)
+                      ? kMenuResumePrebufferFloatBytes
+                      : kMenuResumePrebufferBytes) ||
              !r10_active || local_hold)) {
             playback_prebuffering = false;
             prebuffer_audio_.store(false, std::memory_order_release);
             log::info("[native-dsp] playback prebuffer released ring="
-                      + std::to_string(ring_.available()));
+                      + std::to_string(pcm_buffered_bytes()));
         }
 
         if (!race_state_seen || race_active != last_raw_race_active) {
@@ -2174,7 +2278,7 @@ void FmodInject::native_dsp_gain_thread_fn() {
                 } else {
                     last_race_start_restart = now;
                 }
-                ring_.clear();
+                clear_pcm();
             }
             log::info(std::string("[native-dsp] ")
                       + (race_restart_pending_from_menu
@@ -2687,7 +2791,8 @@ void FmodInject::native_dsp_gain_thread_fn() {
                       + hex(static_cast<uintptr_t>(gs.stinger_c)) + ","
                       + hex(static_cast<uintptr_t>(gs.stinger_d)) + ","
                       + hex(static_cast<uintptr_t>(gs.stinger_e)) + "]"
-                      + " ring_available=" + std::to_string(ring_.available())
+                      + " ring_available="
+                      + std::to_string(pcm_buffered_bytes())
                       + " prebuffer=" + std::to_string(playback_prebuffering));
             diag_state_initialized = true;
             diag_last_r10_active = r10_active;
@@ -2711,7 +2816,7 @@ void FmodInject::native_dsp_gain_thread_fn() {
             if (!playback_prebuffering) {
                 prebuffer_audio_.store(false, std::memory_order_release);
             }
-            if (!audible && !playback_prebuffering) ring_.clear();
+            if (!audible && !playback_prebuffering) clear_pcm();
             bool log_gain =
                 audible != last_audible ||
                 std::fabs(night_runners_factor - last_logged_night_factor) >= 0.10f ||

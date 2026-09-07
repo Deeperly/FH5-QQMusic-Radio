@@ -6,9 +6,6 @@ from pathlib import Path
 import psutil
 import winappaudiorouter as router
 
-from pycaw.pycaw import AudioUtilities
-
-
 GAME_PROCESS = "ForzaHorizon5.exe"
 QQ_PROCESS = "QQMusic.exe"
 VIRTUAL_DEVICE = "Steam Streaming Speakers"
@@ -36,21 +33,13 @@ def game_is_running() -> bool:
 
 def apply_route(running: bool) -> None:
     if running:
-        set_qq_volume_to_100_percent()
         result = router.set_app_output_device(
             process_name=QQ_PROCESS, device=VIRTUAL_DEVICE
         )
         log(f"FH5 running; QQ Music -> {VIRTUAL_DEVICE}: {result}")
     else:
         result = router.clear_app_output_device(process_name=QQ_PROCESS)
-        set_qq_volume_to_100_percent()
         log(f"FH5 exited; QQ Music -> default device: {result}")
-
-
-def set_qq_volume_to_100_percent() -> None:
-    for session in AudioUtilities.GetAllSessions():
-        if session.Process and session.Process.name().lower() == QQ_PROCESS.lower():
-            session.SimpleAudioVolume.SetMasterVolume(1.0, None)
 
 
 def main() -> None:

@@ -1,8 +1,9 @@
-import subprocess
-import time
 import os
+import time
+import traceback
 from pathlib import Path
 
+import psutil
 import winappaudiorouter as router
 
 from pycaw.pycaw import AudioUtilities
@@ -27,14 +28,10 @@ def log(message: str) -> None:
 
 
 def game_is_running() -> bool:
-    result = subprocess.run(
-        ["tasklist", "/FI", f"IMAGENAME eq {GAME_PROCESS}", "/FO", "CSV", "/NH"],
-        capture_output=True,
-        text=True,
-        creationflags=subprocess.CREATE_NO_WINDOW,
-        check=False,
+    return any(
+        (process.info.get("name") or "").lower() == GAME_PROCESS.lower()
+        for process in psutil.process_iter(["name"])
     )
-    return GAME_PROCESS.lower() in result.stdout.lower()
 
 
 def apply_route(running: bool) -> None:
@@ -60,10 +57,16 @@ def main() -> None:
     last_state = None
     log("router started")
     while True:
-        running = game_is_running()
-        if running != last_state:
-            apply_route(running)
-            last_state = running
+        try:
+            running = game_is_running()
+            if running != last_state:
+                apply_route(running)
+                last_state = running
+        except Exception:
+            log(f"router error:\n{traceback.format_exc()}")
+            last_state = None
+            time.sleep(5)
+            continue
         time.sleep(2)
 
 
